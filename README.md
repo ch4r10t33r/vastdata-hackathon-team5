@@ -33,3 +33,15 @@ No claim that a person is an AI. No phone-call scoring. No second camera unless 
 ## What you keep
 
 Tells scores a voice on a call and cannot yet show the evidence under the score. This card is that pattern on video: a claim, the exact sentence it came from, and a check.
+
+## Deploy
+
+On the lab VM:
+
+```bash
+git clone https://github.com/ch4r10t33r/vastdata-hackathon-team5.git
+cd vastdata-hackathon-team5
+bash tools/close-call/deploy.sh
+```
+
+Then open https://workshop.thecosmoslabs.com and click **App**. Search for `person close to a moving forklift` on camera `sdg_warehouse_cam-2`. If the captions never mention a person near a forklift, re-ingest one warehouse chunk before searching again.

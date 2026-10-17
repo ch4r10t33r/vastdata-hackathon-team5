@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Close Call</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #1c1917;
+      --muted: #78716c;
+      --line: #e7e5e4;
+      --paper: #fafaf9;
+      --card: #ffffff;
+      --mark: #9a3412;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font: 16px/1.45 Georgia, "Iowan Old Style", serif;
+      color: var(--ink);
+      background: var(--paper);
+    }
+    header, main { width: min(920px, calc(100% - 32px)); margin: 0 auto; }
+    header { padding: 28px 0 8px; }
+    .eyebrow {
+      font: 600 12px/1 ui-sans-serif, system-ui, sans-serif;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+    h1 { font: 600 40px/1.1 ui-sans-serif, system-ui, sans-serif; margin: 8px 0; }
+    .lede { margin: 0 0 18px; max-width: 38em; }
+    form {
+      display: grid;
+      grid-template-columns: 1fr 220px auto;
+      gap: 8px;
+      margin: 16px 0 8px;
+    }
+    input, button {
+      font: 15px/1.2 ui-sans-serif, system-ui, sans-serif;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 10px 12px;
+      background: white;
+      color: var(--ink);
+    }
+    button { background: var(--ink); color: white; cursor: pointer; }
+    button:disabled { opacity: 0.6; cursor: wait; }
+    .status { min-height: 1.4em; color: var(--muted); font: 14px/1.4 ui-sans-serif, system-ui, sans-serif; }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 14px;
+      margin: 14px 0 18px;
+    }
+    video { width: 100%; max-height: 420px; background: #111; border-radius: 8px; }
+    .meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px 14px;
+      margin: 10px 0;
+      font: 13px/1.3 ui-sans-serif, system-ui, sans-serif;
+      color: var(--muted);
+    }
+    .badge {
+      color: var(--mark);
+      font-weight: 650;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    blockquote {
+      margin: 8px 0;
+      padding-left: 12px;
+      border-left: 3px solid #fdba74;
+    }
+    .fp {
+      font: 12px/1.4 ui-monospace, monospace;
+      color: var(--muted);
+      word-break: break-all;
+    }
+    .verify { margin-top: 8px; }
+    .ok { color: #166534; }
+    .bad { color: #991b1b; }
+    @media (max-width: 720px) {
+      form { grid-template-columns: 1fr; }
+      h1 { font-size: 32px; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="eyebrow">Warehouse safety</div>
+    <h1>Close Call</h1>
+    <p class="lede">The seconds a person was next to a moving forklift, with the sentence the video model wrote and a fingerprint someone else can check.</p>
+    <form id="search-form">
+      <input id="query" name="q" value="person close to a moving forklift" aria-label="Search">
+      <input id="camera" name="camera" value="sdg_warehouse_cam-2" aria-label="Camera">
+      <button id="go" type="submit">Search</button>
+    </form>
+    <p class="status" id="status"></p>
+  </header>
+  <main id="cards"></main>
+  <script>
+    const root = document.getElementById("cards");
+    const status = document.getElementById("status");
+    const button = document.getElementById("go");
+    const base = location.pathname.replace(/\/$/, "");
+
+    function api(path) {
+      return base + path;
+    }
+
+    function line(label, value) {
+      if (!value) return "";
+      const span = document.createElement("span");
+      span.textContent = label + value;
+      return span;
+    }
+
+    function render(data) {
+      root.textContent = "";
+      const cards = data.cards || [];
+      if (!cards.length) {
+        status.textContent = "No caption mentions that moment yet. Re-ingest one warehouse chunk, then search again.";
+        return;
+      }
+      const extra = data.relaxed ? " Nothing on that camera matched, so these are from the rest of the archive." : "";
+      status.textContent = cards.length + (cards.length === 1 ? " card." : " cards.") + extra;
+      cards.forEach(function (card) {
+        const article = document.createElement("article");
+        article.className = "card";
+        const video = document.createElement("video");
+        video.controls = true;
+        video.preload = "metadata";
+        video.src = api("/media?source=" + encodeURIComponent(card.source));
+        const meta = document.createElement("div");
+        meta.className = "meta";
+        const badge = document.createElement("span");
+        badge.className = "badge";
+        badge.textContent = card.mark || "unfiltered";
+        meta.appendChild(badge);
+        [line("", card.camera_id), line("", card.start && card.end ? card.start + "–" + card.end + "s" : ""), line("YOLO ", card.objects)].forEach(function (node) {
+          if (node) meta.appendChild(node);
+        });
+        const quote = document.createElement("blockquote");
+        quote.textContent = card.caption;
+        const fp = document.createElement("div");
+        fp.className = "fp";
+        fp.textContent = card.fingerprint;
+        const verify = document.createElement("button");
+        verify.className = "verify";
+        verify.type = "button";
+        verify.textContent = "Verify";
+        const result = document.createElement("p");
+        result.className = "status";
+        verify.addEventListener("click", function () {
+          verify.disabled = true;
+          result.textContent = "Checking the footage still in the index…";
+          fetch(api("/api/verify"), {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(card)
+          }).then(function (response) {
+            return response.json().then(function (body) {
+              if (!response.ok) throw new Error(body.error || "verify failed");
+              return body;
+            });
+          }).then(function (body) {
+            result.className = body.match ? "status ok" : "status bad";
+            result.textContent = body.match
+              ? "The fingerprint matches the clip still in the index."
+              : "The sentence in the index no longer matches this card.";
+          }).catch(function (err) {
+            result.className = "status bad";
+            result.textContent = err.message;
+          }).finally(function () {
+            verify.disabled = false;
+          });
+        });
+        article.append(video, meta, quote, fp, verify, result);
+        root.appendChild(article);
+      });
+    }
+
+    document.getElementById("search-form").addEventListener("submit", function (event) {
+      event.preventDefault();
+      button.disabled = true;
+      status.textContent = "Searching…";
+      root.textContent = "";
+      const q = document.getElementById("query").value;
+      const camera = document.getElementById("camera").value;
+      const path = "/api/cards?q=" + encodeURIComponent(q) + "&camera=" + encodeURIComponent(camera);
+      fetch(api(path)).then(function (response) {
+        return response.json().then(function (body) {
+          if (!response.ok) throw new Error(body.error || "search failed");
+          return body;
+        });
+      }).then(render).catch(function (err) {
+        status.textContent = err.message;
+      }).finally(function () {
+        button.disabled = false;
+      });
+    });
+  </script>
+</body>
+</html>
